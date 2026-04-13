@@ -10,13 +10,24 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/actions/**"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/Linux.yml"
       - ".github/workflows/macOS.yml"
+      - ".github/workflows/source-tarball.yml"
+      - ".github/workflows/WASM.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/Linux.json"
+      - "cmake/presets/macOS.json"
+      - "cmake/presets/WASM.json"
 
   pull_request:
     branches:
@@ -24,68 +35,139 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/actions/**"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/Linux.yml"
       - ".github/workflows/macOS.yml"
+      - ".github/workflows/source-tarball.yml"
+      - ".github/workflows/WASM.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/Linux.json"
+      - "cmake/presets/macOS.json"
+      - "cmake/presets/WASM.json"
 
 concurrency:
   # cancel jobs on PRs only
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-env:
-  CCACHE_CONFIGPATH: C:/Users/runneradmin/AppData/Roaming/ccache/ccache.conf
+permissions:
+  id-token: write # needed for AWS
 
 jobs:
   build-and-test:
-    name: Build (Qt${{ matrix.qt_version}}, ${{ matrix.arch }})
-    runs-on: windows-2022
+    name: Build (Qt${{ matrix.qt_version }}, ${{ matrix.renderer }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - qt_series: 5
-            qt_version: 5.15.2
-            qt_arch: win64_msvc2019_64
-            qt_modules: ""
-            arch: msvc2019_64
+          - qt_version: 6.10.2
+            qt_arch: win64_msvc2022_64
+            runner: windows-2025
+            arch: msvc2022_64
             compiler: x64
-            compiler_version: 14.29
-            preset: Windows-legacy-ccache
-          - qt_series: 6
-            qt_version: 6.5.3
-            qt_arch: win64_msvc2019_64
-            qt_modules: qtlocation qtpositioning
-            arch: msvc2019_64
+            vsversion: 2022
+            preset: Windows-OpenGL-sccache
+            renderer: OpenGL
+          # - qt_version: 6.10.2
+          #   qt_arch: win64_msvc2022_arm64
+          #   runner: windows-11-arm
+          #   arch: msvc2022_arm64
+          #   compiler: arm64
+          #   vsversion: 2022
+          #   preset: Windows-OpenGL-sccache
+          #   renderer: OpenGL
+          - qt_version: 6.10.2
+            qt_arch: win64_msvc2022_64
+            runner: windows-2025
+            arch: msvc2022_64
             compiler: x64
-            compiler_version: 14.29
-            preset: Windows-ccache
-          - qt_series: 6
-            qt_version: 6.6.3
-            qt_arch: win64_msvc2019_64
-            qt_modules: qtlocation qtpositioning
-            arch: msvc2019_64
+            vsversion: 2022
+            preset: Windows-Vulkan-sccache
+            renderer: Vulkan
+          # - qt_version: 6.10.2
+          #   qt_arch: win64_msvc2022_arm64
+          #   runner: windows-11-arm
+          #   arch: msvc2022_arm64
+          #   compiler: arm64
+          #   vsversion: 2022
+          #   preset: Windows-Vulkan-sccache
+          #   renderer: Vulkan
+          - qt_version: 6.11.0
+            qt_arch: win64_msvc2022_64
+            runner: windows-2025
+            arch: msvc2022_64
             compiler: x64
-            compiler_version: 14.29
-            preset: Windows-ccache
-          - qt_series: 6
-            qt_version: 6.7.2
-            qt_arch: win64_msvc2019_64
-            qt_modules: qtlocation qtpositioning
-            arch: msvc2019_64
+            vsversion: 2022
+            preset: Windows-OpenGL-sccache
+            renderer: OpenGL
+          # - qt_version: 6.11.0
+          #   qt_arch: win64_msvc2022_arm64
+          #   runner: windows-11-arm
+          #   arch: msvc2022_arm64
+          #   compiler: arm64
+          #   vsversion: 2022
+          #   preset: Windows-OpenGL-sccache
+          #   renderer: OpenGL
+          - qt_version: 6.11.0
+            qt_arch: win64_msvc2022_64
+            runner: windows-2025
+            arch: msvc2022_64
             compiler: x64
-            compiler_version: 14.29
-            preset: Windows-ccache
+            vsversion: 2022
+            preset: Windows-Vulkan-sccache
+            renderer: Vulkan
+          # - qt_version: 6.11.0
+          #   qt_arch: win64_msvc2022_arm64
+          #   runner: windows-11-arm
+          #   arch: msvc2022_arm64
+          #   compiler: arm64
+          #   vsversion: 2022
+          #   preset: Windows-Vulkan-sccache
+          #   renderer: Vulkan
 
     env:
       PRESET: ${{ matrix.preset }}
 
     steps:
+      - name: Configure AWS Credentials
+        if: vars.OIDC_AWS_ROLE_TO_ASSUME
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ vars.OIDC_AWS_ROLE_TO_ASSUME }}
+          role-session-name: ${{ github.run_id }}
+
+      - name: Install sccache
+        uses: MinoruSekine/setup-scoop@v4
+        with:
+          buckets: extras
+          apps: sccache
+
+      - name: Configure sccache
+        shell: bash
+        run: |
+          sccache --version
+
+          {
+            echo "SCCACHE_BUCKET=maplibre-native-sccache"
+            echo "SCCACHE_REGION=eu-central-1"
+          } >> "$GITHUB_ENV"
+          if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "AWS_SECRET_ACCESS_KEY not set; not uploading sccache cache to S3"
+            echo "SCCACHE_S3_NO_CREDENTIALS=1" >> "$GITHUB_ENV"
+          fi
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: source
           fetch-depth: 0
@@ -101,32 +183,26 @@ jobs:
       - name: Download Qt
         uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: ==3.1.*
+          aqtversion: ==3.3.*
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git
           version: ${{ matrix.qt_version }}
           target: desktop
           arch: ${{ matrix.qt_arch }}
-          modules: ${{ matrix.qt_modules }}
+          modules: qtlocation qtpositioning
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 3.30.x
 
       - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        uses: seanmiddleditch/gha-setup-ninja@v6
 
       - name: Setup MSVC
-        if: matrix.qt_arch == 'win64_msvc2019_64'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.compiler }}
-          toolset: ${{ matrix.compiler_version }}
-
-      - name: Update ccache
-        run: |
-          choco upgrade ccache
-          ccache --version
-
-      - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: Windows_${{ matrix.qt_version }}_${{ matrix.arch }}
-          max-size: 200M
+          vsversion: ${{ matrix.vsversion }}
 
       - name: Build
         shell: bash
@@ -135,63 +211,70 @@ jobs:
           cmake --workflow --preset ${PRESET}
 
       - name: Install
-        if: matrix.qt_series == 6
         shell: bash
         run: |
           mkdir install && cd install
-          tar xf ../build/qt${{ matrix.qt_series }}-Windows/maplibre-native-qt_*.tar.bz2
+          tar xf ../build/qt6-Windows-${{ matrix.renderer }}/maplibre-native-qt_*.tar.bz2
           mv maplibre-native-qt_* maplibre-native-qt
 
       - name: Build QtQuick Example
-        if: matrix.qt_series == 6
         shell: bash
         working-directory: source/examples/quick
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Build QtQuick Standalone Example
+        shell: bash
+        working-directory: source/examples/quick-standalone
+        run: |
+          export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
+          cmake --workflow --preset default
+
       - name: Build QtWidgets Example
-        if: matrix.qt_series == 6
         shell: bash
         working-directory: source/examples/widgets
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Show sccache stats
+        run: sccache --show-stats
+
       - name: Upload installation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}
-          path: build/qt${{ matrix.qt_series }}-Windows/maplibre-native-qt_*.tar.bz2
+          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}_${{ matrix.renderer }}
+          path: build/qt6-Windows-${{ matrix.renderer }}/maplibre-native-qt_*.tar.bz2
 
       - name: Upload examples
-        if: matrix.qt_series == 6
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}_examples
-          path: build/qt${{ matrix.qt_series }}-example-*/*.tar.bz2
+          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}_${{ matrix.renderer }}_examples
+          path: build/qt6-example-*/*.tar.bz2
 
   release:
     name: Release
     if: github.ref_type == 'tag'
-    runs-on: windows-2022
+    runs-on: windows-2025
     needs: build-and-test
     permissions:
       contents: write
     strategy:
       matrix:
-        qt_version: [5.15.2, 6.5.3, 6.6.3, 6.7.2]
-        arch: [msvc2019_64]
+        qt_version: [6.10.2, 6.11.0]
+        arch: [msvc2022_64, msvc2022_arm64]
+        renderer: [OpenGL, Vulkan]
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}
+          name: Windows_${{ matrix.arch }}_${{ matrix.qt_version }}_${{ matrix.renderer }}
 
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_Windows.tar.bz2
+          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_Windows_${{ matrix.renderer }}.tar.bz2
           allowUpdates: true
           draft: true

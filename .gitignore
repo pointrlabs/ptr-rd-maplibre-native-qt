@@ -1,4 +1,6 @@
 .cache
+.DS_Store
 *.user
 compile_commands.json
 docs/output
+.venv

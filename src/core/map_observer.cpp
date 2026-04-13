@@ -13,6 +13,8 @@
 
 namespace QMapLibre {
 
+/*! \cond PRIVATE */
+
 MapObserver::MapObserver(MapPrivate *ptr)
     : d_ptrRef(ptr) {}
 
@@ -73,7 +75,7 @@ void MapObserver::onWillStartRenderingFrame() {
     emit mapChanged(Map::MapChangeWillStartRenderingFrame);
 }
 
-void MapObserver::onDidFinishRenderingFrame(mbgl::MapObserver::RenderFrameStatus status) {
+void MapObserver::onDidFinishRenderingFrame(const mbgl::MapObserver::RenderFrameStatus &status) {
     if (status.mode == mbgl::MapObserver::RenderMode::Partial) {
         emit mapChanged(Map::MapChangeDidFinishRenderingFrame);
     } else {
@@ -109,5 +111,7 @@ void MapObserver::onSourceChanged(mbgl::style::Source & /* source */) {
     emit copyrightsChanged(QString::fromStdString(attribution));
     emit mapChanged(Map::MapChangeSourceDidChange);
 }
+
+/*! \endcond */
 
 } // namespace QMapLibre

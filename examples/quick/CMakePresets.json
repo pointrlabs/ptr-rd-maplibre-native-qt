@@ -8,16 +8,16 @@
   "configurePresets": [
     {
       "name": "default",
-      "displayName": "MapLibre Qt Quick example configuration",
+      "displayName": "MapLibre Qt Quick QtLocation example configuration",
       "generator": "Ninja",
-      "binaryDir": "${sourceParentDir}/../../build/qt6-example-quick",
+      "binaryDir": "${sourceParentDir}/../../build/qt6-example-quick-qtlocation",
       "toolchainFile": "$penv{QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
         "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64",
-        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0",
         "QMapLibre_DIR": "$penv{QMapLibre_DIR}/lib/cmake/QMapLibre"
       }
     }
@@ -25,21 +25,21 @@
   "buildPresets": [
     {
       "name": "default",
-      "displayName": "MapLibre Qt Quick example build",
+      "displayName": "MapLibre Qt Quick QtLocation example build",
       "configurePreset": "default"
     }
   ],
   "packagePresets": [
     {
       "name": "default",
-      "displayName": "MapLibre Qt Quick example package",
+      "displayName": "MapLibre Qt Quick QtLocation example package",
       "configurePreset": "default"
     }
   ],
   "workflowPresets": [
     {
       "name": "default",
-      "displayName": "MapLibre Qt Quick example workflow",
+      "displayName": "MapLibre Qt Quick QtLocation example workflow",
       "steps": [
         {
           "type": "configure",

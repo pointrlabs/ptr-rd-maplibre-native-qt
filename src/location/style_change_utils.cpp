@@ -47,9 +47,10 @@ QMapLibre::Coordinates qgeocoordinate2mapboxcoordinate(const QList<QGeoCoordinat
 namespace QMapLibre::StyleChangeUtils {
 
 QString featureId(QDeclarativeGeoMapItemBase *item) {
-    return QStringLiteral("QtLocation-") + ((item->objectName().isEmpty())
-                                                ? QString::number(quint64(item)) // NOLINT(google-readability-casting)
-                                                : item->objectName());
+    return QStringLiteral("QtLocation-") +
+           ((item->objectName().isEmpty())
+                ? QString::number(quint64(item)) // NOLINT(google-readability-casting,modernize-avoid-c-style-cast)
+                : item->objectName());
 }
 
 Feature featureFromMapRectangle(QDeclarativeRectangleMapItem *item) {
@@ -269,8 +270,8 @@ std::vector<FeatureProperty> featurePropertiesFromMapItem(QDeclarativeGeoMapItem
 
     std::vector<FeatureProperty> properties;
     properties.reserve(layoutProperties.size() + paintProperties.size());
-    std::move(layoutProperties.begin(), layoutProperties.end(), std::back_inserter(properties));
-    std::move(paintProperties.begin(), paintProperties.end(), std::back_inserter(properties));
+    std::ranges::move(layoutProperties, std::back_inserter(properties));
+    std::ranges::move(paintProperties, std::back_inserter(properties));
     return properties;
 }
 

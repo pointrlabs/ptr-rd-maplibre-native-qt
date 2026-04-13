@@ -10,12 +10,23 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/macOS.yml"
+      - ".github/workflows/source-tarball.yml"
+      - ".github/workflows/WASM.yml"
       - ".github/workflows/Windows.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/macOS.json"
+      - "cmake/presets/WASM.json"
+      - "cmake/presets/Windows.json"
 
   pull_request:
     branches:
@@ -23,62 +34,141 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/macOS.yml"
+      - ".github/workflows/source-tarball.yml"
+      - ".github/workflows/WASM.yml"
       - ".github/workflows/Windows.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/macOS.json"
+      - "cmake/presets/WASM.json"
+      - "cmake/presets/Windows.json"
 
 concurrency:
   # cancel jobs on PRs only
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  id-token: write # needed for AWS
+
 jobs:
   build-and-test:
-    name: Build (Qt${{ matrix.qt_version}}, ${{ matrix.compiler }})
-    runs-on: ubuntu-24.04
+    name: Build (Qt${{ matrix.qt_version }}, ${{ matrix.host }} ${{ matrix.renderer }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - qt_series: 5
-            qt_version: 5.15.2
-            qt_modules: ""
-            preset: Linux-legacy-CI
+          - qt_version: 6.10.2
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-OpenGL-sccache-CI
+            renderer: OpenGL
             compiler: default
-          - qt_series: 6
-            qt_version: 6.5.3
-            qt_modules: qtlocation qtpositioning
-            preset: Linux-CI
+          - qt_version: 6.10.2
+            host: linux_arm64
+            runner: ubuntu-24.04-arm
+            preset: Linux-OpenGL-sccache-CI
+            renderer: OpenGL
+            compiler: gcc
+          - qt_version: 6.10.2
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-Vulkan-sccache-CI
+            renderer: Vulkan
             compiler: default
-          - qt_series: 6
-            qt_version: 6.6.3
-            qt_modules: qtlocation qtpositioning
-            preset: Linux-CI
+          - qt_version: 6.10.2
+            host: linux_arm64
+            runner: ubuntu-24.04-arm
+            preset: Linux-Vulkan-sccache-CI
+            renderer: Vulkan
+            compiler: gcc
+          - qt_version: 6.11.0
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-OpenGL-sccache-CI
+            renderer: OpenGL
             compiler: default
-          - qt_series: 6
-            qt_version: 6.7.2
-            qt_modules: qtlocation qtpositioning
-            preset: Linux-CI
+          - qt_version: 6.11.0
+            host: linux_arm64
+            runner: ubuntu-24.04-arm
+            preset: Linux-OpenGL-sccache-CI
+            renderer: OpenGL
+            compiler: gcc
+          - qt_version: 6.11.0
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-Vulkan-sccache-CI
+            renderer: Vulkan
             compiler: default
-          - qt_series: 6
-            qt_version: 6.7.2
-            qt_modules: qtlocation qtpositioning
-            preset: Linux-coverage
-            compiler: gcc-13
-            gcov: gcov-13
+          - qt_version: 6.11.0
+            host: linux_arm64
+            runner: ubuntu-24.04-arm
+            preset: Linux-Vulkan-sccache-CI
+            renderer: Vulkan
+            compiler: gcc
+          - qt_version: 6.11.0
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-OpenGL-coverage
+            renderer: OpenGL
+            compiler: gcc-14
+            gcov: gcov-14
+          - qt_version: 6.11.0
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-OpenGL-clang-tidy
+            renderer: OpenGL
+            compiler: llvm
+          - qt_version: 6.11.0
+            host: linux
+            runner: ubuntu-24.04
+            preset: Linux-Vulkan-clang-tidy
+            renderer: Vulkan
+            compiler: llvm
 
     env:
       PRESET: ${{ matrix.preset }}
 
     steps:
+      - name: Configure AWS Credentials
+        if: vars.OIDC_AWS_ROLE_TO_ASSUME
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ vars.OIDC_AWS_ROLE_TO_ASSUME }}
+          role-session-name: ${{ github.run_id }}
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: source
           submodules: recursive
           fetch-depth: 0
+
+      - name: Install sccache
+        uses: ./source/.github/actions/install-sccache
+        with:
+          arch: ${{ matrix.host }}
+
+      - name: Configure sccache
+        run: |
+          {
+            echo "SCCACHE_BUCKET=maplibre-native-sccache"
+            echo "SCCACHE_REGION=eu-central-1"
+          } >> "$GITHUB_ENV"
+          if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "AWS_SECRET_ACCESS_KEY not set; not uploading sccache cache to S3"
+            echo "SCCACHE_S3_NO_CREDENTIALS=1" >> "$GITHUB_ENV"
+          fi
 
       - name: Install test dependencies
         if: matrix.compiler != 'default'
@@ -98,13 +188,31 @@ jobs:
 
       - name: Install compiler
         id: install_compiler
-        if: matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.compiler != 'llvm'
         uses: rlalik/setup-cpp-compiler@master
         with:
           compiler: ${{ matrix.compiler }}
 
+      - name: Install LLVM
+        id: install_llvm
+        if: matrix.compiler == 'llvm'
+        run: |
+          llvm_version="21"
+          tmpdir="$(mktemp -d)"
+          cd "$tmpdir"
+          curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh
+          chmod +x llvm.sh
+          # Set DPKG_FORCE to overwrite because the packages may conflict with the
+          # pre-installed ones from the GitHub Actions runner image.
+          sudo env DPKG_FORCE=overwrite ./llvm.sh "$llvm_version" all
+          rm -rf -- "$tmpdir"
+
+          echo "CLANG_TIDY_PATH=/usr/lib/llvm-${llvm_version}/bin" >> "$GITHUB_ENV"
+          echo "cc=clang-${llvm_version}" >> "$GITHUB_OUTPUT"
+          echo "cxx=clang++-${llvm_version}" >> "$GITHUB_OUTPUT"
+
       - name: Install lcov
-        if: matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.compiler != 'llvm'
         run: |
           sudo apt-get update
           sudo apt-get install \
@@ -121,7 +229,7 @@ jobs:
             libtiff6 \
             libwebp7
 
-          git clone https://github.com/linux-test-project/lcov.git -b v2.0
+          git clone https://github.com/linux-test-project/lcov.git -b v2.3.2
           pushd lcov
           sudo make -j$(nproc) install
           popd
@@ -130,110 +238,118 @@ jobs:
       - name: Download Qt
         uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: ==3.1.*
+          aqtversion: ==3.3.*
           version: ${{ matrix.qt_version }}
           dir: ${{ github.workspace }}
+          host: ${{ matrix.host }}
           target: desktop
-          modules: ${{ matrix.qt_modules }}
+          modules: qtlocation qtpositioning
 
       - name: Setup ninja
         if: matrix.compiler != 'default'
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: Linux_${{ matrix.qt_version }}_${{ matrix.compiler }}
-          max-size: 200M
-
-      - name: Build (Qt5)
-        if: matrix.qt_series == 5
-        uses: ./source/.github/actions/qt5-build
-
-      - name: Build (Qt6)
-        if: matrix.qt_series == 6 && matrix.compiler == 'default'
+      - name: Build (Qt6, CentOS 9, GCC11)
+        if: matrix.compiler == 'default'
         uses: ./source/.github/actions/qt6-build
+        with:
+          preset: ${{ matrix.preset }}
+          renderer: ${{ matrix.renderer }}
 
       - name: Build (Qt6, custom compiler)
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default'
         env:
-          CC: ${{ steps.install_compiler.outputs.cc }}
-          CXX: ${{ steps.install_compiler.outputs.cxx }}
+          CC: ${{ steps.install_compiler.outputs.cc || steps.install_llvm.outputs.cc }}
+          CXX: ${{ steps.install_compiler.outputs.cxx || steps.install_llvm.outputs.cxx }}
           GCOV: ${{ matrix.gcov }}
         working-directory: source
         run: |
           export GCOV_PATH="$(which ${GCOV})"
+          export CMAKE_MAKE_PROGRAM="$(which ninja)"
           cmake --workflow --preset ${PRESET}
 
       - name: Run tests
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && !(matrix.host == 'linux_arm64' && matrix.renderer == 'Vulkan') && !(matrix.compiler == 'llvm' && matrix.renderer == 'Vulkan')
         uses: coactions/setup-xvfb@v1
         with:
           run: ctest --output-on-failure
-          working-directory: build/qt6-Linux
+          working-directory: build/qt6-Linux-${{ matrix.renderer }}
 
       - name: Run code coverage
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.preset == 'Linux-OpenGL-coverage'
         uses: coactions/setup-xvfb@v1
         with:
           run: ninja coverage
-          working-directory: build/qt6-Linux
+          working-directory: build/qt6-Linux-${{ matrix.renderer }}
 
       - name: Install
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.preset != 'Linux-OpenGL-coverage'
         run: |
           mkdir install && cd install
-          tar xf ../build/qt${{ matrix.qt_series }}-Linux/maplibre-native-qt_*.tar.bz2
+          tar xf ../build/qt6-Linux-${{ matrix.renderer }}/maplibre-native-qt_*.tar.bz2
           mv maplibre-native-qt_* maplibre-native-qt
 
       - name: Build QtQuick Example
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.preset != 'Linux-OpenGL-coverage'
         working-directory: source/examples/quick
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Build QtQuick Standalone Example
+        if: matrix.compiler != 'default' && matrix.preset != 'Linux-OpenGL-coverage'
+        working-directory: source/examples/quick-standalone
+        run: |
+          export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
+          cmake --workflow --preset default
+
       - name: Build QtWidgets Example
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
+        if: matrix.compiler != 'default' && matrix.preset != 'Linux-OpenGL-coverage'
         working-directory: source/examples/widgets
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Show sccache stats
+        if: matrix.compiler != 'default'
+        run: sccache --show-stats
+
       - name: Upload installation
         if: matrix.compiler == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Linux_${{ matrix.qt_version }}
-          path: build/qt${{ matrix.qt_series }}-Linux/maplibre-native-qt_*.tar.bz2
+          name: ${{ matrix.host }}_${{ matrix.qt_version }}_${{ matrix.renderer }}
+          path: build/qt6-Linux-${{ matrix.renderer }}/maplibre-native-qt_*.tar.bz2
 
       - name: Upload coverage reports to Codecov
-        if: matrix.qt_series == 6 && matrix.compiler != 'default'
-        uses: codecov/codecov-action@v3
+        if: matrix.compiler != 'default' && matrix.preset == 'Linux-OpenGL-coverage'
+        uses: codecov/codecov-action@v6
         with:
-          files: build/qt${{ matrix.qt_series }}-Linux/coverage.info
+          files: build/qt6-Linux-${{ matrix.renderer }}/coverage.info
           verbose: true
 
   release:
     name: Release
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-and-test
     permissions:
       contents: write
     strategy:
       matrix:
-        qt_version: [5.15.2, 6.5.3, 6.6.3, 6.7.2]
+        qt_version: [6.10.2, 6.11.0]
+        renderer: [OpenGL, Vulkan]
+        host: [linux, linux_arm64]
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: Linux_${{ matrix.qt_version }}
+          name: ${{ matrix.host }}_${{ matrix.qt_version }}_${{ matrix.renderer }}
 
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_Linux.tar.bz2
+          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_${{ matrix.host }}_${{ matrix.renderer }}.tar.bz2
           allowUpdates: true
           draft: true

@@ -10,13 +10,24 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/actions/**"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/Linux.yml"
+      - ".github/workflows/source-tarball.yml"
       - ".github/workflows/Windows.yml"
+      - ".github/workflows/WASM.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/Linux.json"
+      - "cmake/presets/WASM.json"
+      - "cmake/presets/Windows.json"
 
   pull_request:
     branches:
@@ -24,18 +35,32 @@ on:
     paths-ignore:
       - ".gitignore"
       - "README.md"
+      - "docs/**"
       # ignore CI for other platforms
       - ".github/FUNDING.yml"
       - ".github/actions/**"
       - ".github/workflows/Android.yml"
+      - ".github/workflows/CI-cache-cleanup.yml"
+      - ".github/workflows/docs-test.yml"
+      - ".github/workflows/gh-pages-docs.yml"
       - ".github/workflows/iOS.yml"
       - ".github/workflows/Linux.yml"
+      - ".github/workflows/source-tarball.yml"
       - ".github/workflows/Windows.yml"
+      - ".github/workflows/WASM.yml"
+      - "cmake/presets/Android.json"
+      - "cmake/presets/iOS.json"
+      - "cmake/presets/Linux.json"
+      - "cmake/presets/WASM.json"
+      - "cmake/presets/Windows.json"
 
 concurrency:
   # cancel jobs on PRs only
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  id-token: write # needed for AWS
 
 jobs:
   build-and-test:
@@ -44,41 +69,22 @@ jobs:
     strategy:
       matrix:
         include:
-          - qt_series: 5
-            qt_version: 5.15.2
-            qt_modules: ""
-            preset: macOS-legacy-ccache
+          - qt_version: 6.10.2
+            preset: macOS-sccache
             compiler: default
-            runs_on: macos-13
-          - qt_series: 6
-            qt_version: 6.5.3
-            qt_modules: qtlocation qtpositioning
-            preset: macOS-ccache
+            runs_on: macos-15
+          - qt_version: 6.11.0
+            preset: macOS-sccache
             compiler: default
-            runs_on: macos-14
-          - qt_series: 6
-            qt_version: 6.6.3
-            qt_modules: qtlocation qtpositioning
-            preset: macOS-ccache
-            compiler: default
-            runs_on: macos-14
-          - qt_series: 6
-            qt_version: 6.7.2
-            qt_modules: qtlocation qtpositioning
-            preset: macOS-ccache
-            compiler: default
-            runs_on: macos-14
-          - qt_series: 6
-            qt_version: 6.7.2
-            preset: macOS-ccache
+            runs_on: macos-15
+          - qt_version: 6.11.0
+            preset: macOS-sccache
             compiler: static
-            runs_on: macos-14
-          - qt_series: 6
-            qt_version: 6.7.2
-            qt_modules: qtlocation qtpositioning
+            runs_on: macos-15
+          - qt_version: 6.11.0
             preset: macOS-clang-tidy
-            compiler: llvm
-            runs_on: macos-14
+            compiler: llvm@22
+            runs_on: macos-15
 
     env:
       COMPILER: ${{ matrix.compiler }}
@@ -86,38 +92,43 @@ jobs:
       QT_VERSION: ${{ matrix.qt_version }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        if: vars.OIDC_AWS_ROLE_TO_ASSUME
+        uses: aws-actions/configure-aws-credentials@v6
         with:
-          path: source
-          submodules: recursive
-          fetch-depth: 0
+          aws-region: us-west-2
+          role-to-assume: ${{ vars.OIDC_AWS_ROLE_TO_ASSUME }}
+          role-session-name: ${{ github.run_id }}
+
+      - name: Install sccache
+        run: |
+          brew install sccache
+
+      - name: Set up sccache
+        run: |
+          {
+            echo "SCCACHE_BUCKET=maplibre-native-sccache"
+            echo "SCCACHE_REGION=eu-central-1"
+            echo "SCCACHE_CACHE_MULTIARCH=1"
+          } >> "$GITHUB_ENV"
+          if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "AWS_SECRET_ACCESS_KEY not set; not uploading sccache cache to S3"
+            echo "SCCACHE_S3_NO_CREDENTIALS=1" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
-      - name: Setup compiler (macOS)
-        if: matrix.compiler != 'default' && matrix.compiler != 'static'
-        run: |
-          brew install "$COMPILER"
-          echo "/opt/homebrew/opt/${COMPILER}/bin" >> "$GITHUB_PATH"
-          {
-            echo "CC=/opt/homebrew/opt/${COMPILER}/bin/clang"
-            echo "CXX=/opt/homebrew/opt/${COMPILER}/bin/clang++"
-            echo "LDFLAGS=\"-L/opt/homebrew/opt/${COMPILER}/lib\""
-            echo "CPPFLAGS=\"-I/opt/homebrew/opt/${COMPILER}/include\""
-          } >> "$GITHUB_ENV"
-
       - name: Download Qt
         if: matrix.compiler != 'static'
         uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: ==3.1.*
+          aqtversion: ==3.3.*
           version: ${{ matrix.qt_version }}
           target: desktop
-          modules: ${{ matrix.qt_modules }}
+          modules: qtlocation qtpositioning
 
       - name: Download Static Qt
         if: matrix.compiler == 'static'
@@ -129,14 +140,32 @@ jobs:
           echo "$PWD/Qt/$QT_VERSION/macos_static/bin" >> $GITHUB_PATH
           cd $GITHUB_WORKSPACE
 
-      - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
-
-      - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
         with:
-          key: macOS_${{ matrix.qt_version }}_${{ matrix.compiler }}
-          max-size: 200M
+          cmake-version: 3.30.x
+
+      - name: Setup ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup compiler
+        if: matrix.compiler != 'default' && matrix.compiler != 'static'
+        run: |
+          brew install "$COMPILER"
+          echo "/opt/homebrew/opt/${COMPILER}/bin" >> "$GITHUB_PATH"
+          {
+            echo "CC=/opt/homebrew/opt/${COMPILER}/bin/clang"
+            echo "CXX=/opt/homebrew/opt/${COMPILER}/bin/clang++"
+            echo "LDFLAGS=-L/opt/homebrew/opt/${COMPILER}/lib -L/opt/homebrew/opt/${COMPILER}/lib/c++ -L/opt/homebrew/opt/${COMPILER}/lib/unwind -lunwind"
+            echo "CPPFLAGS=-I/opt/homebrew/opt/${COMPILER}/include"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          path: source
+          submodules: recursive
+          fetch-depth: 0
 
       - name: Build
         working-directory: source
@@ -144,68 +173,73 @@ jobs:
           cmake --workflow --preset ${PRESET}
 
       - name: Install
+        if: matrix.compiler == 'default'
         run: |
           mkdir install && cd install
-          tar xf ../build/qt${{ matrix.qt_series }}-macOS/maplibre-native-qt_*.tar.bz2
+          tar xf ../build/qt6-macOS/maplibre-native-qt_*.tar.bz2
           mv maplibre-native-qt_* maplibre-native-qt
 
       - name: Build QtQuick Example
-        if: matrix.qt_series == 6 && matrix.compiler == 'default'
+        if: matrix.compiler == 'default'
         working-directory: source/examples/quick
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Build QtQuick Standalone Example
+        if: matrix.compiler == 'default'
+        working-directory: source/examples/quick-standalone
+        run: |
+          export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
+          cmake --workflow --preset default
+
       - name: Build QtWidgets Example
-        if: matrix.qt_series == 6 && matrix.compiler == 'default'
+        if: matrix.compiler == 'default'
         working-directory: source/examples/widgets
         run: |
           export QMapLibre_DIR="$GITHUB_WORKSPACE/install/maplibre-native-qt"
           cmake --workflow --preset default
 
+      - name: Show sccache stats
+        run: sccache --show-stats
+
       - name: Upload installation
         if: matrix.compiler == 'default' || matrix.compiler == 'static'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macOS_${{ matrix.qt_version }}_${{ matrix.compiler }}
-          path: build/qt${{ matrix.qt_series }}-macOS/maplibre-native-qt_*.tar.bz2
+          path: build/qt6-macOS/maplibre-native-qt_*.tar.bz2
 
       - name: Upload examples
-        if: matrix.qt_series == 6 && matrix.compiler == 'default'
-        uses: actions/upload-artifact@v4
+        if: matrix.compiler == 'default'
+        uses: actions/upload-artifact@v7
         with:
           name: macOS_${{ matrix.qt_version }}_examples
-          path: build/qt${{ matrix.qt_series }}-example-*/*.tar.bz2
+          path: build/qt6-example-*/*.tar.bz2
 
   release:
     name: Release
     if: github.ref_type == 'tag'
-    runs-on: macos-14
+    runs-on: macos-15
     needs: build-and-test
     permissions:
       contents: write
     strategy:
       matrix:
         include:
-          - qt_version: 5.15.2
+          - qt_version: 6.10.2
             compiler: default
-            suffix: ""
-          - qt_version: 6.5.3
+            suffix: Metal
+          - qt_version: 6.11.0
             compiler: default
-            suffix: ""
-          - qt_version: 6.6.3
-            compiler: default
-            suffix: ""
-          - qt_version: 6.7.2
-            compiler: default
-            suffix: ""
-          - qt_version: 6.7.2
+            suffix: Metal
+          - qt_version: 6.11.0
             compiler: static
-            suffix: "_static"
+            suffix: Metal_static
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: macOS_${{ matrix.qt_version }}_${{ matrix.compiler }}
 
@@ -216,11 +250,11 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
           PLATFORM_SUFFIX: ${{ matrix.suffix }}
         run: |
-          mv maplibre-native-qt_${TAG_NAME}_Qt${QT_VERSION}_macOS.tar.bz2 maplibre-native-qt_${TAG_NAME}_Qt${QT_VERSION}_macOS${PLATFORM_SUFFIX}.tar.bz2
+          mv maplibre-native-qt_${TAG_NAME}_Qt${QT_VERSION}_macOS_Metal.tar.bz2 maplibre-native-qt_${TAG_NAME}_Qt${QT_VERSION}_macOS_${PLATFORM_SUFFIX}.tar.bz2
 
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_macOS${{ matrix.suffix }}.tar.bz2
+          artifacts: maplibre-native-qt_${{ github.ref_name }}_Qt${{ matrix.qt_version }}_macOS_${{ matrix.suffix }}.tar.bz2
           allowUpdates: true
           draft: true

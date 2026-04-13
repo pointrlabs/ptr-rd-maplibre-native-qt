@@ -1,5 +1,6 @@
 # Core MapLibre Native definitions
 set(MLN_WITH_QT ON CACHE BOOL "Build MapLibre Native Core with Qt platform" FORCE)
+set(MLN_TEXT_SHAPING_HARFBUZZ OFF CACHE BOOL "Use haffbuzz to shape complex text" FORCE)
 set(MLN_QT_LIBRARY_ONLY ON CACHE BOOL "Build only MapLibre Native Core Qt bindings libraries" FORCE)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(MLN_QT_WITH_INTERNAL_SQLITE ON CACHE BOOL "Build MapLibre Native Core with internal sqlite" FORCE)
@@ -23,6 +24,8 @@ set(MLNQtCore_Headers
     utils.hpp
 
     style/style_parameter.hpp
+    style/filter_parameter.hpp
+    style/image_parameter.hpp
     style/layer_parameter.hpp
     style/source_parameter.hpp
 )
@@ -61,11 +64,23 @@ target_sources(
         map_observer.cpp map_observer_p.hpp
         map_renderer.cpp map_renderer_p.hpp
         map.cpp map_p.hpp
+        scheduler.cpp scheduler_p.hpp
         settings.cpp settings_p.hpp
         types.cpp
         utils.cpp
 
+        $<$<BOOL:${MLN_WITH_METAL}>:rendering/metal_renderer_backend.mm>
+        $<$<BOOL:${MLN_WITH_METAL}>:rendering/metal_renderer_backend_p.hpp>
+        $<$<BOOL:${MLN_WITH_OPENGL}>:rendering/opengl_renderer_backend.cpp>
+        $<$<BOOL:${MLN_WITH_OPENGL}>:rendering/opengl_renderer_backend_p.hpp>
+        $<$<BOOL:${MLN_WITH_VULKAN}>:rendering/vulkan_renderer_backend.cpp>
+        $<$<BOOL:${MLN_WITH_VULKAN}>:rendering/vulkan_renderer_backend_p.hpp>
+        rendering/renderer_backend_p.hpp
+        rendering/renderer_observer_p.hpp
+
         style/style_parameter.cpp
+        style/filter_parameter.cpp
+        style/image_parameter.cpp
         style/layer_parameter.cpp
         style/source_parameter.cpp
 
@@ -98,8 +113,14 @@ endif()
 # Common compile definitions
 target_compile_definitions(
     MLNQtCore
+    PUBLIC
+        $<$<BOOL:${MLN_WITH_METAL}>:MLN_RENDER_BACKEND_METAL=1>
+        $<$<BOOL:${MLN_WITH_OPENGL}>:MLN_RENDER_BACKEND_OPENGL=1>
+        $<$<BOOL:${MLN_WITH_VULKAN}>:MLN_RENDER_BACKEND_VULKAN=1>
+        $<$<BOOL:${MLN_QT_WITH_RENDERER_DEBUGGING}>:MLN_RENDERER_DEBUGGING=1>
     PRIVATE
         QT_BUILD_MAPLIBRE_CORE_LIB
+        $<$<PLATFORM_ID:Windows>:NOMINMAX>
 )
 
 # Common include directories
@@ -159,6 +180,23 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         MLNQtCore
         INTERFACE
             $<INSTALL_INTERFACE:lib/${MLN_QT_NAME}.framework>
+    )
+endif()
+
+# Metal backend sources
+if (APPLE AND MLN_WITH_METAL)
+    target_link_libraries(
+        MLNQtCore
+        PRIVATE
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework CoreFoundation"
+    )
+
+    target_include_directories(
+        MLNQtCore
+        PRIVATE
+            ${MLN_CORE_PATH}/vendor/metal-cpp
     )
 endif()
 

@@ -6,11 +6,18 @@ set(CMAKECONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${MLN_QT_NAME}/)
 # Components
 add_subdirectory(core)
 set(MLN_QT_SUPPORTED_COMPONENTS "Core")
+
+if(MLN_QT_WITH_QUICK_PLUGIN OR MLN_QT_WITH_LOCATION)
+    add_subdirectory(quick)
+    list(APPEND MLN_QT_SUPPORTED_COMPONENTS "QuickPrivate")
+endif()
+
 if(MLN_QT_WITH_LOCATION)
     add_subdirectory(location)
     list(APPEND MLN_QT_SUPPORTED_COMPONENTS "Location")
     message(STATUS "Building location module")
 endif()
+
 if(MLN_QT_WITH_WIDGETS)
     add_subdirectory(widgets)
     list(APPEND MLN_QT_SUPPORTED_COMPONENTS "Widgets")

@@ -4,7 +4,6 @@
 
 #include "source_style_change_p.hpp"
 #include "style/source_parameter.hpp"
-#include "style/style_parameter.hpp"
 
 #include <QMapLibre/Map>
 
@@ -12,6 +11,8 @@
 #include <QtCore/QFile>
 
 namespace QMapLibre {
+
+/*! \cond PRIVATE */
 
 // StyleAddSource
 StyleAddSource::StyleAddSource(const Feature &feature)
@@ -48,11 +49,14 @@ StyleAddSource::StyleAddSource(const SourceParameter *parameter)
             }
             break;
         case 3: { // geojson
-            const QString data = parameter->property("data").toString();
+            const QString data = parameter->parsedProperty("data").toString();
             if (data.startsWith(':')) {
                 QFile geojson(data);
-                geojson.open(QIODevice::ReadOnly);
-                m_params[QStringLiteral("data")] = geojson.readAll();
+                if (geojson.open(QIODevice::ReadOnly)) {
+                    m_params[QStringLiteral("data")] = geojson.readAll();
+                } else {
+                    qWarning() << "Failed to open GeoJSON file:" << data;
+                }
             } else {
                 m_params[QStringLiteral("data")] = data.toUtf8();
             }
@@ -93,5 +97,7 @@ void StyleRemoveSource::apply(Map *map) {
 
     map->removeSource(m_id);
 }
+
+/*! \endcond */
 
 } // namespace QMapLibre

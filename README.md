@@ -4,9 +4,10 @@
 
 MapLibre Native Qt bindings and Qt Location MapLibre Plugin
 
-**Important notice:** Repository is being reorganised for Qt 6.5 support.
-Some features will go away temporarily and API will change also for older
-releases in the upcoming version 3.0 of the Qt bindings and Qt Location plugin.
+**Important notice:** the repository and code have been reorganised for Qt 6.5 support.
+Version 4.0 is a major release that includes major rendering backend changes.
+Thus it does not maintain backward compatibility with version 3.x.
+It is still in active development and API may change before the stable release.
 
 ## Qt support
 
@@ -14,38 +15,20 @@ This library fully supports Qt 6.5 and newer.
 Qt 5.15 is fully supported only on desktop platforms, previous Qt 5 versions
 down to 5.6 only support widgets but not Qt Location.
 
-## How to build?
+## Get and build
 
-Both plugin and MapLibre build in one step. `ninja` and `ccache` are recommended.
-For Qt 6 using the `qt-cmake` wrapper is recommended.
+The project uses submodules, so you need to clone it with the following commands:
 
 ```shell
-mkdir build && cd build
-cmake ../maplibre-native-qt -GNinja \
-  -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
-  -DCMAKE_CXX_COMPILER_LAUNCHER="ccache" \
-  -DCMAKE_INSTALL_PREFIX="../install"
-ninja
-ninja install
+git clone https://github.com/maplibre/maplibre-native-qt.git
+cd maplibre-native-qt
+git submodule update --init --recursive
 ```
 
-### Linux
+(On some file systems, the submodule update may yield a `Filename too long` error
+which can be ignored.)
 
-Note that when using the system ICU library standalone Qt installation using
-installer is ignored. If you want to use that you need to make sure that your
-system ICU is not too new as it may prevent your app from running on older
-versions of Linux. Alternatively you can use internally bundled ICU with the
-`-DMLN_QT_WITH_INTERNAL_ICU=ON` CMake option.
-
-### macOS
-
-Add the following arguments to the CMake call:
-`-GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"`
-
-### iOS
-
-Add the following arguments to the CMake call:
-`-G"Ninja Multi-Config" -DCMAKE_CONFIGURATION_TYPES="Release;Debug"`
+For more details on building the project, see [How to build](docs/Building.md).
 
 ## How to use?
 
@@ -56,6 +39,13 @@ Two example projects based on Qt 6 are available in the
 To build an example, run the following commands:
 
 ```shell
+export QMapLibre_DIR="<absolute-path-to-install>"
+cmake --workflow --preset default
+```
+
+or alternatively
+
+```shell
 mkdir build-example && cd build-example
 qt-cmake ../maplibre-native-qt/examples/<example> -GNinja \
   -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
@@ -64,7 +54,7 @@ qt-cmake ../maplibre-native-qt/examples/<example> -GNinja \
 ninja
 ```
 
-For macOS a deployment target `deploy` is provided for convenience.
+For more details on using the library, see [Usage](docs/Usage.md).
 
 ## Copyright
 

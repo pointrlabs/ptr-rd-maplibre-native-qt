@@ -18,12 +18,18 @@
 #include <QtCore/QStringList>
 #include <QtGui/QImage>
 
-#include <functional>
 #include <memory>
+
+#ifdef MLN_RENDER_BACKEND_VULKAN
+namespace mbgl::vulkan {
+class Texture2D;
+} // namespace mbgl::vulkan
+#endif
 
 namespace QMapLibre {
 
 class MapPrivate;
+class MapRenderer;
 
 class Q_MAPLIBRE_CORE_EXPORT Map : public QObject {
     Q_OBJECT
@@ -116,6 +122,8 @@ public:
     void setCoordinateZoom(const Coordinate &coordinate, double zoom);
 
     void jumpTo(const CameraOptions &);
+    void easeTo(const CameraOptions &camera, const AnimationOptions &animation);
+    void flyTo(const CameraOptions &camera, const AnimationOptions &animation);
 
     void setGestureInProgress(bool inProgress);
 
@@ -136,7 +144,7 @@ public:
     void scaleBy(double scale, const QPointF &center = QPointF());
     void rotateBy(const QPointF &first, const QPointF &second);
 
-    void resize(const QSize &size);
+    void resize(const QSize &size, qreal pixelRatio = 0);
 
     [[nodiscard]] QPointF pixelForCoordinate(const Coordinate &coordinate) const;
     [[nodiscard]] Coordinate coordinateForPixel(const QPointF &pixel) const;
@@ -171,17 +179,43 @@ public:
     [[nodiscard]] QVariant getFilter(const QString &layerId) const;
     // When rendering on a different thread,
     // should be called on the render thread.
-    void createRenderer();
+    void createRenderer(void *nativeTargetPtr);
+#ifdef MLN_RENDER_BACKEND_VULKAN
+    // Vulkan-specific: create the renderer using Qt's Vulkan device
+    void createRendererWithQtVulkanDevice(void *windowPtr,
+                                          void *physicalDevice,
+                                          void *device,
+                                          uint32_t graphicsQueueIndex);
+#endif
+    void updateRenderer(const QSize &size, qreal pixelRatio, quint32 fbo = 0);
     void destroyRenderer();
-    void setFramebufferObject(quint32 fbo, const QSize &size);
+
+    void setCurrentDrawable(void *texturePtr);
+    void setExternalDrawable(void *texturePtr, const QSize &textureSize);
+
+#ifdef MLN_RENDER_BACKEND_VULKAN
+    // Vulkan-specific: get the Vulkan texture object.
+    mbgl::vulkan::Texture2D *getVulkanTexture() const;
+
+    // Vulkan-specific: read image data from the Vulkan texture.
+    // std::shared_ptr<mbgl::PremultipliedImage> readVulkanImageData() const;
+#endif
+
+#ifdef MLN_RENDER_BACKEND_OPENGL
+    // OpenGL-specific: get the OpenGL framebuffer texture ID for direct texture sharing.
+    [[nodiscard]] unsigned int getFramebufferTextureId() const;
+#endif
 
 public slots:
     void render();
     void setConnectionEstablished();
+    void triggerRepaint();
 
     // Commit changes, load all the resources
     // and renders the map when completed.
     void startStaticRender();
+
+    [[nodiscard]] void *nativeColorTexture() const;
 
 signals:
     void needsRendering();

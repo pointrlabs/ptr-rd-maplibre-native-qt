@@ -64,6 +64,8 @@ namespace QMapLibre {
     \brief The Settings class stores the initial configuration for Map.
     \ingroup QMapLibre
 
+    \headerfile settings.hpp <QMapLibre/Settings>
+
     Settings is used to configure Map at the moment of its creation.
     Once created, the Settings of a Map can no longer be changed.
 
@@ -223,6 +225,10 @@ Settings::Settings(Settings &&s) noexcept = default;
     \brief Copy assignment operator.
 */
 Settings &Settings::operator=(const Settings &s) {
+    if (this == &s) {
+        return *this;
+    }
+
     d_ptr = std::make_unique<SettingsPrivate>(*s.d_ptr);
     return *this;
 }
@@ -631,6 +637,8 @@ const mbgl::TileServerOptions &Settings::tileServerOptions() const {
     return d_ptr->m_tileServerOptions;
 }
 
+/*! \cond PRIVATE */
+
 // Private implementation
 SettingsPrivate::SettingsPrivate()
     : m_cacheMaximumSize(mbgl::util::DEFAULT_MAX_CACHE_SIZE),
@@ -664,5 +672,7 @@ void SettingsPrivate::setProviderApiBaseUrl(const QString &url) {
 
     m_tileServerOptions = std::move(m_tileServerOptions.withBaseURL(url.toStdString()));
 }
+
+/*! \endcond */
 
 } // namespace QMapLibre

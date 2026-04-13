@@ -28,6 +28,8 @@ public:
     explicit DeclarativeSourceParameter(QObject *parent = nullptr);
     ~DeclarativeSourceParameter() override = default;
 
+    [[nodiscard]] QVariant parsedProperty(const char *propertyName) const override;
+
 private:
     // QQmlParserStatus implementation
     MLN_DECLARATIVE_PARSER(DeclarativeSourceParameter)

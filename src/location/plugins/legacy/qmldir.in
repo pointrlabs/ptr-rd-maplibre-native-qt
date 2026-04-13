@@ -1,5 +1,0 @@
-module MapLibre
-linktarget @MLN_QT_QML_PLUGIN@
-plugin @MLN_QT_QML_PLUGIN@
-classname MapLibreQmlModule
-prefer :/MapLibre/
