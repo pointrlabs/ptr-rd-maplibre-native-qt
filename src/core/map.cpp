@@ -629,6 +629,17 @@ double Map::maximumZoom() const {
 }
 
 /*!
+    \brief Set the maximum zoom level allowed for the map.
+    \param maxZoom The maximum zoom level. The core clamps this to its hard
+    ceiling of 25.5.
+
+    \sa maximumZoom()
+*/
+void Map::setMaxZoom(double maxZoom) {
+    d_ptr->mapObj->setBounds(mbgl::BoundOptions().withMaxZoom(maxZoom));
+}
+
+/*!
     \property Map::coordinate
     \brief The map center coordinate.
     \sa coordinate()

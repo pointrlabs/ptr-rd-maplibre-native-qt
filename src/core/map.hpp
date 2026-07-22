@@ -105,6 +105,7 @@ public:
 
     [[nodiscard]] double minimumZoom() const;
     [[nodiscard]] double maximumZoom() const;
+    void setMaxZoom(double maxZoom);
 
     [[nodiscard]] double bearing() const;
     void setBearing(double degrees);
