@@ -129,6 +129,11 @@ void MapRenderer::updateParameters(std::shared_ptr<mbgl::UpdateParameters> param
     m_updateParameters = std::move(parameters);
 }
 
+std::vector<mbgl::Feature> MapRenderer::queryRenderedFeatures(const mbgl::ScreenCoordinate &point,
+                                                              const mbgl::RenderedQueryOptions &options) const {
+    return m_renderer->queryRenderedFeatures(point, options);
+}
+
 void MapRenderer::updateRenderer(const mbgl::Size &size, qreal pixelRatio, quint32 fbo) {
     MBGL_VERIFY_THREAD(tid);
 

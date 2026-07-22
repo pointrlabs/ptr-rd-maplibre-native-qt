@@ -58,6 +58,9 @@ public:
     // Thread-safe, called by the Frontend
     void updateParameters(std::shared_ptr<mbgl::UpdateParameters> parameters);
 
+    std::vector<mbgl::Feature> queryRenderedFeatures(const mbgl::ScreenCoordinate &point,
+                                                     const mbgl::RenderedQueryOptions &options = {}) const;
+
     // Backend-specific helpers
 #if defined(MLN_RENDER_BACKEND_METAL) || defined(MLN_RENDER_BACKEND_VULKAN)
     [[nodiscard]] void *currentDrawableTexture() const { return m_backend.currentDrawable(); }

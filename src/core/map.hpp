@@ -206,6 +206,8 @@ public:
     [[nodiscard]] unsigned int getFramebufferTextureId() const;
 #endif
 
+    std::vector<Feature> queryRenderedFeatures(const QPointF &point, const QVector<QString> &layerIds);
+
 public slots:
     void render();
     void setConnectionEstablished();

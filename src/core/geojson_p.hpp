@@ -27,4 +27,16 @@ mbgl::Value asPropertyValue(const QVariant &value);
 mbgl::FeatureIdentifier asFeatureIdentifier(const QVariant &id);
 mbgl::GeoJSONFeature asFeature(const Feature &feature);
 
+// Reverse converters: mbgl::GeoJSONFeature -> QMapLibre::Feature.
+// Only consumed by Map::queryRenderedFeatures.
+CoordinatesCollections asCoordinatesCollections(const mbgl::Point<double> &point);
+CoordinatesCollections asCoordinatesCollections(const mbgl::LineString<double> &lineString);
+CoordinatesCollections asCoordinatesCollections(const mbgl::Polygon<double> &polygon);
+CoordinatesCollections asCoordinatesCollections(const mbgl::MultiPoint<double> &points);
+CoordinatesCollections asCoordinatesCollections(const mbgl::MultiLineString<double> &lineStrings);
+CoordinatesCollections asCoordinatesCollections(const mbgl::MultiPolygon<double> &polygons);
+QVariant asQVariant(const mbgl::Value &value);
+QVariant asQVariant(const mbgl::FeatureIdentifier &id);
+Feature asFeature(const mbgl::GeoJSONFeature &feature);
+
 } // namespace QMapLibre::GeoJSON

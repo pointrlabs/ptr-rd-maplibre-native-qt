@@ -1468,6 +1468,24 @@ QVector<QString> Map::layerIds() const {
     return layerIds;
 }
 
+std::vector<Feature> Map::queryRenderedFeatures(const QPointF &point, const QVector<QString> &layerIds) {
+    std::vector<std::string> stdLayerIds;
+    stdLayerIds.reserve(static_cast<std::size_t>(layerIds.size()));
+    for (const auto &layerId : layerIds) {
+        stdLayerIds.push_back(layerId.toStdString());
+    }
+
+    const auto features =
+        d_ptr->queryRenderedFeatures({point.x(), point.y()}, mbgl::RenderedQueryOptions(stdLayerIds, {}));
+
+    std::vector<Feature> qtFeatures;
+    qtFeatures.reserve(features.size());
+    for (const auto &feature : features) {
+        qtFeatures.push_back(GeoJSON::asFeature(feature));
+    }
+    return qtFeatures;
+}
+
 /*!
     \brief Add a style image.
     \param id The image identifier.
@@ -2044,6 +2062,15 @@ unsigned int MapPrivate::getFramebufferTextureId() const {
     return m_mapRenderer ? m_mapRenderer->getFramebufferTextureId() : 0;
 }
 #endif
+
+std::vector<mbgl::Feature> MapPrivate::queryRenderedFeatures(const mbgl::ScreenCoordinate &point,
+                                                             const mbgl::RenderedQueryOptions &options) const {
+    const std::scoped_lock lock(m_mapRendererMutex);
+    if (m_mapRenderer == nullptr) {
+        return {};
+    }
+    return m_mapRenderer->queryRenderedFeatures(point, options);
+}
 
 /*! \endcond */
 

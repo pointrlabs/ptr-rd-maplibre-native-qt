@@ -57,6 +57,9 @@ public:
                                    const QString &name,
                                    const QVariant &value) const;
 
+    [[nodiscard]] std::vector<mbgl::Feature> queryRenderedFeatures(
+        const mbgl::ScreenCoordinate &point, const mbgl::RenderedQueryOptions &options = {}) const;
+
     mbgl::EdgeInsets margins;
     std::unique_ptr<mbgl::Map> mapObj;
 
